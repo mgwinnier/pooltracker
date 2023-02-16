@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Blue Pixels Map</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAsav7hEKLla2FBNTq7WrZI0vH_JXwT7p4&libraries=geometry"></script>
+  </head>
+  <body>
+    <div id="map" style="height: 500px; width: 100%;"></div>
+    <script>
+      function initMap() {
+        var map = new google.maps.Map(document.getElementById('map'), {
+          center: {lat: 32.7767, lng: -96.7970},
+          zoom: 12,
+          mapTypeId: 'satellite'
+        });
+        var image = {
+          url: 'https://www.gstatic.com/images/icons/material/system/1x/arrow_drop_down_circle_black_20dp.png',
+          size: new google.maps.Size(20, 20),
+          anchor: new google.maps.Point(10, 10)
+        };
+        var bounds = map.getBounds();
+        var imageCanvas = document.createElement('canvas');
+        imageCanvas.width = imageCanvas.height = 1;
+        var imageContext = imageCanvas.getContext('2d');
+        imageContext.drawImage(image, 0, 0);
+        var imageSrc = imageCanvas.toDataURL();
+        var blueThreshold = 80;
+        var blueRange = [0, 0, blueThreshold, 255];
+        var polygonCoords = [
+          new google.maps.LatLng(7011442.87239, 2470967.40008),
+          new google.maps.LatLng(7011442.87239, 2473130.59452),
+          new google.maps.LatLng(7009619.95573, 2470967.40008),
+          new google.maps.LatLng(7009619.95573, 2473130.59452)
+        ];
+        var countyPolygon = new google.maps.Polygon({
+          paths: polygonCoords,
+          strokeColor: '#FF0000',
+          strokeOpacity: 0.8,
+          strokeWeight: 2,
+          fillColor: '#FF0000',
+          fillOpacity: 0.35,
+          map: map
+        });
+        map.addListener('idle', function() {
+          var blueMarkers = [];
+          var pixelData = map.getCanvas().getContext('2d').getImageData(0, 0, map.getCanvas().width, map.getCanvas().height).data;
+          for (var i = 0; i < pixelData.length; i += 4) {
+            var r = pixelData[i];
+            var g = pixelData[i + 1];
+            var b = pixelData[i + 2];
+            if (r >= blueRange[0] && r <= blueRange[1] && g >= blueRange[2] && g <= blueRange[3] && b >= blueRange[0] && b <= blueRange[1]) {
+              var x = (i / 4) % map.getCanvas().width;
+              var y = Math.floor((i / 4) / map.getCanvas().width);
+              var latLng = new google.maps.LatLng(bounds.getNorthEast().lat() - (y / map.getCanvas().height) * (bounds.getNorthEast().lat() - bounds.getSouthWest().lat()), bounds.getSouthWest().lng() + (x / map.getCanvas().width) * (bounds.getNorthEast().lng() - bounds.getSouthWest().lng()));
+              if (google.maps.geometry.poly.containsLocation(latLng, countyPolygon)) {
+                blueMarkers.push(new google.maps.Marker({
+                  position: latLng,
+                  map: map,
+                  icon: imageSrc
+                }));
+              }
+            }
+          }
+        });
+      }
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAsav7hEKLla2FBNTq7WrZI0vH_JXwT7p4&libraries=geometry&callback=initMap"></script>
+  </body>
+</html>
