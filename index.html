@@ -78,8 +78,6 @@
      *  Sign in the user upon button click.
      */
      function handleAuthClick() {
-  var rowNumber = 2; // Start at row 2 to avoid overwriting the header row.
-
   tokenClient.callback = async (resp) => {
     if (resp.error !== undefined) {
       throw (resp);
@@ -87,6 +85,10 @@
     document.getElementById('signout_button').style.visibility = 'visible';
     document.getElementById('authorize_button').innerText = 'Refresh';
     document.getElementById('update-button').style.display = 'inline-block';
+
+    // Load existing markers from the Google Sheet and add them to the map.
+    const markers = await writeMarkersFromSheet();
+    addMarkersToMap(markers);
 
     // Add a click event listener to the map object to handle clicks on the map.
     google.maps.event.addListener(map, 'click', function(event) {
@@ -101,19 +103,12 @@
       var lng = event.latLng.lng();
 
       // Add the latitude and longitude values to the Google Sheet.
-      AddLatLong(lat, lng, rowNumber);
-      rowNumber++;
+      AddLatLong(lat, lng, response.result.values.length + 1);
+
+      // Add the new marker to the map and to the array of markers.
+      markers.push(marker);
     });
   };
-
-  if (gapi.client.getToken() === null) {
-    // Prompt the user to select a Google Account and ask for consent to share their data
-    // when establishing a new session.
-    tokenClient.requestAccessToken({ prompt: 'consent' });
-  } else {
-    // Skip display of account chooser and consent dialog for an existing session.
-    tokenClient.requestAccessToken({ prompt: '' });
-  }
 }
 
 function AddLatLong(lat, long, row) {
@@ -158,6 +153,57 @@ function AddLatLong(lat, long, row) {
       }
     }
 
+    /**
+ * Creates a copy of the spreadsheet with the data and returns the URL of the new spreadsheet.
+ */
+async function createSheetCopy() {
+  const fileId = '1938Hcm_yxfYjpJCR3xxssndFeX8UZbW_JnNY-FE1Kt0';
+  const copyMetadata = {
+    name: 'Copy of Pool Marker Data',
+  };
+  const response = await gapi.client.drive.files.copy({
+    fileId: fileId,
+    resource: copyMetadata,
+  });
+  const copyId = response.result.id;
+  const copyUrl = `https://docs.google.com/spreadsheets/d/${copyId}`;
+  console.log(`Copied sheet URL: ${copyUrl}`);
+  return copyUrl;
+}
+
+/**
+ * Writes all the markers from the sheet to the map.
+ */
+async function writeMarkersFromSheet() {
+  const spreadsheetId = '1938Hcm_yxfYjpJCR3xxssndFeX8UZbW_JnNY-FE1Kt0';
+  const sheetName = 'DallasCounty';
+  const range = `${sheetName}!A2:B`;
+  const response = await gapi.client.sheets.spreadsheets.values.get({
+    spreadsheetId: spreadsheetId,
+    range: range,
+  });
+  const values = response.result.values;
+  if (values.length === 0) {
+    console.log('No data found.');
+    return;
+  }
+  for (let i = 0; i < values.length; i++) {
+    const lat = Number(values[i][0]);
+    const lng = Number(values[i][1]);
+    addMarkerToMap(lat, lng);
+  }
+}
+
+/**
+ * Adds a marker to the map at the given latitude and longitude.
+ */
+function addMarkerToMap(lat, lng) {
+  const marker = new google.maps.Marker({
+    position: { lat: lat, lng: lng },
+    map: map,
+  });
+  markers.push(marker);
+}
   </script>
   <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
   <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
